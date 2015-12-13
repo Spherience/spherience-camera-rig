@@ -4,9 +4,14 @@ import android.annotation.TargetApi;
 import android.hardware.Camera;
 import android.os.Build;
 import android.os.Environment;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.net.UnknownHostException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -15,6 +20,9 @@ import java.util.List;
  * Created by snigavig on 13.12.15.
  */
 public class CameraHelper {
+
+    private static final int SERVERPORT = 8080;
+    private static final String SERVER_IP = "146.185.190.210";
 
     public static final int MEDIA_TYPE_IMAGE = 1;
     public static final int MEDIA_TYPE_VIDEO = 2;
@@ -137,9 +145,9 @@ public class CameraHelper {
         File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_PICTURES), "CameraSample");
         // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
+        //between applications and persist after your app has been uninstalled.
 
-        // Create the storage directory if it does not exist
+        //Create the storage directory if it does not exist
         if (! mediaStorageDir.exists()){
             if (! mediaStorageDir.mkdirs()) {
                 Log.d("CameraSample", "failed to create directory");
@@ -155,11 +163,41 @@ public class CameraHelper {
                     "IMG_"+ timeStamp + ".jpg");
         } else if(type == MEDIA_TYPE_VIDEO) {
             mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-                    "VID_"+ timeStamp + ".mp4");
+                    "VID_"+ timeStamp + ".3gp");
         } else {
             return null;
         }
 
+
+        Log.d("!!!!!!!!!!!!", "starting spocket");
+
+//        InetAddress serverAddr = null;
+//        try {
+//            serverAddr = InetAddress.getByName(SERVER_IP);
+//        } catch (UnknownHostException e) {
+//            Log.d("!!!!!!!!!!!! ERROR", e.getLocalizedMessage());
+//            e.printStackTrace();
+//        }
+//        Socket socket = null;
+//        try {
+//            socket = new Socket(serverAddr, SERVERPORT);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//            Log.d("!!!!!!!!!!!! ERROR", e.getLocalizedMessage());
+//        }
+//
+//        ParcelFileDescriptor pfd = ParcelFileDescriptor.fromSocket(socket);
+//        Log.d("!!!!!!!!!!!!", pfd.toString());
+//        ParcelFileDescriptor[] parcelFileDescriptors = new ParcelFileDescriptor[0];
+//        try {
+//            parcelFileDescriptors = ParcelFileDescriptor.createPipe();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+//        ParcelFileDescriptor parcelRead = new ParcelFileDescriptor(parcelFileDescriptors[0]);
+//        ParcelFileDescriptor parcelWrite  = new ParcelFileDescriptor(parcelFileDescriptors[1]);
+
+        //return pfd;
         return mediaFile;
     }
 

@@ -14,6 +14,10 @@ import android.view.TextureView;
 import android.view.View;
 import android.widget.Button;
 
+import com.neovisionaries.ws.client.WebSocket;
+import com.neovisionaries.ws.client.WebSocketException;
+import com.neovisionaries.ws.client.WebSocketFactory;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -107,9 +111,13 @@ public class MainActivity extends AppCompatActivity {
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private boolean prepareVideoRecorder(){
+
+        Log.d("!!!!!!!!!!!!", "prepare!!");
         releaseCamera();
+        Log.d("!!!!!!!!!!!!", "released camera");
         mCamera = CameraHelper.getDefaultCameraInstance();
 
+        Log.d("!!!!!!!!!!!!", "got new instance");
         // We need to make sure that our preview and recording video size are supported by the
         // camera. Query camera to find all the sizes and choose the optimal size given the
         // dimensions of our preview surface.
@@ -122,9 +130,11 @@ public class MainActivity extends AppCompatActivity {
         CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
         profile.videoFrameWidth = optimalSize.width;
         profile.videoFrameHeight = optimalSize.height;
+        //profile.fileFormat = MediaRecorder.OutputFormat.THREE_GPP;
 
         // likewise for the camera object itself.
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
+        //parameters.setPreviewSize(optimalSize.width, optimalSize.height);
         mCamera.setParameters(parameters);
         try {
             // Requires API level 11+, For backward compatibility use {@link setPreviewDisplay}
@@ -149,12 +159,22 @@ public class MainActivity extends AppCompatActivity {
         // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
         mMediaRecorder.setProfile(profile);
 
-        Log.d("!!!!!!!", CameraHelper.getOutputMediaFile(
-                CameraHelper.MEDIA_TYPE_VIDEO).toString());
+        Log.d("!!!!!!!!!!!!", "starting!");
 
         // Step 4: Set output file
-        mMediaRecorder.setOutputFile(CameraHelper.getOutputMediaFile(
-                CameraHelper.MEDIA_TYPE_VIDEO).toString());
+        mMediaRecorder.setOutputFile(CameraHelper.getOutputMediaFile(CameraHelper.MEDIA_TYPE_VIDEO).toString());
+
+        try {
+            WebSocket ws = new WebSocketFactory().createSocket("ws://146.185.190.210:8080");
+            try {
+                ws.connect();
+                ws.sendText("Toraaaaas");
+            } catch (WebSocketException e) {
+                e.printStackTrace();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
         // Step 5: Prepare configured MediaRecorder
         try {
@@ -183,6 +203,12 @@ public class MainActivity extends AppCompatActivity {
             if (prepareVideoRecorder()) {
                 // Camera is available and unlocked, MediaRecorder is prepared,
                 // now you can start recording
+
+//                try {
+//                    Thread.sleep(2000);
+//                } catch (InterruptedException e) {
+//                    e.printStackTrace();
+//                }
                 mMediaRecorder.start();
 
                 isRecording = true;
