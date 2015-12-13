@@ -10,8 +10,11 @@ import android.os.ParcelFileDescriptor;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 
 import com.neovisionaries.ws.client.WebSocket;
@@ -24,27 +27,39 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements SurfaceHolder.Callback {
 
     private static final ScheduledExecutorService worker =
             Executors.newSingleThreadScheduledExecutor();
     private Camera mCamera;
-    private TextureView mPreview;
-    private MediaRecorder mMediaRecorder;
+    private SurfaceView mPreview;
+    private SurfaceHolder mHolder;
+    //private MediaRecorder mMediaRecorder;
 
     private boolean isRecording = false;
     private static final String TAG = "Recorder";
-    private Button captureButton;
+
+    CameraSurfaceView surface_view;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mPreview = (TextureView) findViewById(R.id.surface_view);
-        captureButton = (Button) findViewById(R.id.button_capture);
+        mPreview = (SurfaceView) findViewById(R.id.surface_view);
+
+        mHolder = mPreview.getHolder();
+        mHolder.addCallback(this);
+        mHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
+        mHolder.setKeepScreenOn(true);
+        surface_view = new CameraSurfaceView(this);
+        //mGLView = new MySurfaceView(this);
+        //setContentView(mGLView);
+        addContentView(surface_view, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.FILL_PARENT, ViewGroup.LayoutParams.FILL_PARENT));
     }
+
 
     /**
      * The capture button controls all user interaction. When recording, the button click
@@ -57,49 +72,39 @@ public class MainActivity extends AppCompatActivity {
         if (isRecording) {
 
             // stop recording and release camera
-            mMediaRecorder.stop();  // stop the recording
-            releaseMediaRecorder(); // release the MediaRecorder object
-            mCamera.lock();         // take camera access back from MediaRecorder
+            //mMediaRecorder.stop();  // stop the recording
+            //releaseMediaRecorder(); // release the MediaRecorder object
+            //mCamera.lock();         // take camera access back from MediaRecorder
 
-            // inform the user that recording has stopped
-            setCaptureButtonText("Capture");
             isRecording = false;
             releaseCamera();
 
-        } else {
-
-
-            new MediaPrepareTask().execute(null, null, null);
-
-
         }
-    }
-
-    private void setCaptureButtonText(String title) {
-        captureButton.setText(title);
     }
 
     @Override
     protected void onPause() {
         super.onPause();
         // if we are using MediaRecorder, release it first
-        releaseMediaRecorder();
+        //releaseMediaRecorder();
         // release the camera immediately on pause event
         releaseCamera();
     }
 
-    private void releaseMediaRecorder(){
-        if (mMediaRecorder != null) {
-            // clear recorder configuration
-            mMediaRecorder.reset();
-            // release the recorder object
-            mMediaRecorder.release();
-            mMediaRecorder = null;
-            // Lock camera for later use i.e taking it back from MediaRecorder.
-            // MediaRecorder doesn't need it anymore and we will release it if the activity pauses.
-            mCamera.lock();
-        }
-    }
+//    private void releaseMediaRecorder(){
+////        if (mMediaRecorder != null) {
+////            // clear recorder configuration
+////            mMediaRecorder.reset();
+////            // release the recorder object
+////            mMediaRecorder.release();
+////            mMediaRecorder = null;
+////            // Lock camera for later use i.e taking it back from MediaRecorder.
+////            // MediaRecorder doesn't need it anymore and we will release it if the activity pauses.
+//         //   mCamera.lock();
+//        if (mWs.isOpen())
+//            mWs.sendClose();
+//        //}
+//    }
 
     private void releaseCamera(){
         if (mCamera != null){
@@ -136,106 +141,65 @@ public class MainActivity extends AppCompatActivity {
         parameters.setPreviewSize(profile.videoFrameWidth, profile.videoFrameHeight);
         //parameters.setPreviewSize(optimalSize.width, optimalSize.height);
         mCamera.setParameters(parameters);
-        try {
-            // Requires API level 11+, For backward compatibility use {@link setPreviewDisplay}
-            // with {@link SurfaceView}
-            mCamera.setPreviewTexture(mPreview.getSurfaceTexture());
-        } catch (IOException e) {
-            Log.e(TAG, "Surface texture is unavailable or unsuitable" + e.getMessage());
-            return false;
-        }
-
-
-        mMediaRecorder = new MediaRecorder();
-
-        // Step 1: Unlock and set camera to MediaRecorder
-        mCamera.unlock();
-        mMediaRecorder.setCamera(mCamera);
-
-        // Step 2: Set sources
-        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.DEFAULT);
-        mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
-
-        // Step 3: Set a CamcorderProfile (requires API Level 8 or higher)
-        mMediaRecorder.setProfile(profile);
-
-        Log.d("!!!!!!!!!!!!", "starting!");
-
-        // Step 4: Set output file
-        mMediaRecorder.setOutputFile(CameraHelper.getOutputMediaFile(CameraHelper.MEDIA_TYPE_VIDEO).toString());
-
-        try {
-            WebSocket ws = new WebSocketFactory().createSocket("ws://146.185.190.210:8080");
-            try {
-                ws.connect();
-                ws.sendText("Toraaaaas");
-            } catch (WebSocketException e) {
-                e.printStackTrace();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        // Step 5: Prepare configured MediaRecorder
-        try {
-            mMediaRecorder.prepare();
-        } catch (IllegalStateException e) {
-            Log.d(TAG, "IllegalStateException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
-            return false;
-        } catch (IOException e) {
-            Log.d(TAG, "IOException preparing MediaRecorder: " + e.getMessage());
-            releaseMediaRecorder();
-            return false;
-        }
         return true;
     }
 
-    /**
-     * Asynchronous task for preparing the {@link android.media.MediaRecorder} since it's a long blocking
-     * operation.
-     */
-    class MediaPrepareTask extends AsyncTask<Void, Void, Boolean> {
-
-        @Override
-        protected Boolean doInBackground(Void... voids) {
-            // initialize video camera
-            if (prepareVideoRecorder()) {
-                // Camera is available and unlocked, MediaRecorder is prepared,
-                // now you can start recording
-
-//                try {
-//                    Thread.sleep(2000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-                mMediaRecorder.start();
-
-                isRecording = true;
-            } else {
-                // prepare didn't work, release the camera
-                releaseMediaRecorder();
-                return false;
-            }
-            return true;
+    public void previewCamera()
+    {
+        try
+        {
+            mCamera.setPreviewDisplay(mHolder);
+            mCamera.startPreview();
         }
-
-        @Override
-        protected void onPostExecute(Boolean result) {
-            if (!result) {
-                MainActivity.this.finish();
-            }
-            // inform the user that recording has started
-            setCaptureButtonText("Stop");
-
+        catch(Exception e)
+        {
+            Log.d(TAG, "Cannot start preview.", e);
         }
     }
 
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder)
+    {
+        // Surface will be destroyed when we return, so stop the preview.
+        if (mCamera != null)
+        {
+            mCamera.stopPreview();
+        }
+    }
 
-//            Runnable task = new Runnable() {
-//                public void run() {
-//                    mMediaRecorder.stop();
-//                }
-//            };
-//            worker.schedule(task, 15, TimeUnit.SECONDS);
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height)
+    {
+        // Now that the size is known, set up the camera parameters and begin
+        // the preview.
+        if (mCamera != null)
+        {
+            Camera.Parameters parameters = mCamera.getParameters();
+            Camera.Size previewSize = getPreviewSize();
+            parameters.setPreviewSize(previewSize.width, previewSize.height);
+            previewCamera();
+        }
+
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder)
+    {
+        if (null != mCamera) {
+            try {
+                mCamera.setPreviewDisplay(holder);
+                mCamera.startPreview();
+            } catch (IOException e) {
+                Log.d("booooo", "Error setting camera preview: " + e.getMessage());
+            }
+        }
+    }
+
+        public Camera.Size getPreviewSize()
+    {
+        Camera.Parameters parameters = mCamera.getParameters();
+        List<Camera.Size> mSupportedPreviewSizes = parameters.getSupportedPreviewSizes();
+        return CameraHelper.getOptimalPreviewSize(mSupportedPreviewSizes,
+                mPreview.getWidth(), mPreview.getHeight());
+    }
 }
