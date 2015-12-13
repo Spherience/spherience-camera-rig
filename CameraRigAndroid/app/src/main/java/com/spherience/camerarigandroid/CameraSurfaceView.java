@@ -1,9 +1,13 @@
 package com.spherience.camerarigandroid;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.hardware.Camera;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.util.AttributeSet;
+import android.util.Base64;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
@@ -17,8 +21,12 @@ import com.neovisionaries.ws.client.WebSocket;
 import com.neovisionaries.ws.client.WebSocketException;
 import com.neovisionaries.ws.client.WebSocketFactory;
 
+import net.majorkernelpanic.streaming.SessionBuilder;
+import net.majorkernelpanic.streaming.rtsp.RtspServer;
+
 import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Created by snigavig on 13.12.15.
@@ -57,10 +65,10 @@ public class CameraSurfaceView extends ViewGroup implements SurfaceHolder.Callba
         @Override
         protected Boolean doInBackground(byte[]... bytes) {
             try {
-                mWs = new WebSocketFactory().createSocket("ws://146.185.190.210:8080");
+                mWs = new WebSocketFactory().createSocket("ws://146.185.190.210:8001");
                 try {
                     mWs.connect();
-                    mWs.sendText("Toraaaaas go!");
+                    //mWs.sendText("Toraaaaas go!");
                 } catch (WebSocketException e) {
                     e.printStackTrace();
                 }
@@ -77,8 +85,11 @@ public class CameraSurfaceView extends ViewGroup implements SurfaceHolder.Callba
 
         @Override
         protected Boolean doInBackground(byte[]... bytes) {
-            if(null != mWs && mWs.isOpen())
-                mWs.sendBinary(bytes[0], true);
+            if (null != mWs && mWs.isOpen()) {
+                String imgString = Base64.encodeToString(bytes[0], Base64.NO_WRAP);
+                mWs.sendText(imgString, true);
+            }
+            //mWs.sendBinary(bytes[0], true);
             return true;
         }
 
@@ -143,6 +154,19 @@ public class CameraSurfaceView extends ViewGroup implements SurfaceHolder.Callba
             mCamera.setParameters(parameters);
             mCamera.setPreviewCallback(this);
             mCamera.startPreview();
+
+            SharedPreferences.Editor editor = PreferenceManager.getDefaultSharedPreferences(mContext).edit();
+            editor.putString(RtspServer.KEY_PORT, String.valueOf(1234));
+            editor.commit();
+
+            SessionBuilder.getInstance().setCamera(0)
+                    //.setSurfaceHolder(mSurfaceView.getHolder())
+                    .setContext(mContext)
+                    .setAudioEncoder(SessionBuilder.AUDIO_AAC)
+                    .setVideoEncoder(SessionBuilder.VIDEO_H264);
+
+            // Starts the RTSP server
+            mContext.startService(new Intent(mContext, RtspServer.class));
         }
 
     }
@@ -318,8 +342,12 @@ public class CameraSurfaceView extends ViewGroup implements SurfaceHolder.Callba
 
     @Override
     public void onPreviewFrame(byte[] bytes, Camera camera) {
-        Log.d("22222", "mazafaka");
+        Log.d("22222", "got some frame");
 
-        new SendFrameTask().execute(bytes);
+        try {
+            new SendFrameTask().execute(bytes).get();
+        } catch (InterruptedException | ExecutionException e) {
+            e.printStackTrace();
+        }
     }
 }
